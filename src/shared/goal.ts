@@ -2,6 +2,16 @@
 export const MAX_GOAL_SYSTEM_PROMPT_CHARS = 20_000;
 
 /**
+ * Shared DVS authorization boundary for every default meta-prompter.
+ *
+ * The loop may infer implementation choices from established project context, but it must never
+ * turn ambiguity into permission for an action that materially changes the outside world.
+ */
+export const GOAL_AUTHORIZATION_BOUNDARY = `Never invent the user's authorization. If ChatGPT asks whether it may take an action that is destructive, irreversible, external, security-sensitive, or spends money — including deleting data, rewriting git history or force-pushing, sending or publishing content, deploying externally, purchasing or paying, changing accounts/access/security, or exposing/uploading private data — approve it only when the user's own request or stated goal already clearly authorizes that action. Otherwise refuse or defer that action and continue only reversible work already inside the requested scope. Ordinary implementation choices may still be inferred from established requirements and project context. Uncertainty is never permission. This rule overrides any generic instruction to keep going, raise the bar, clean up, delete, publish, send, deploy, or decide a blocker.`;
+
+export const GOAL_AUTHORIZATION_TRAILER = `Do not invent authorization: destructive, irreversible, external, security-sensitive, payment, or private-data actions may be approved only when the user's own request or stated goal already clearly authorized them. Otherwise refuse or defer them and keep only reversible in-scope work moving. Ordinary implementation choices may still be inferred from established context.`;
+
+/**
  * All three Goal models are meta-prompters, not reviewers.
  *
  * Each one is handed a conversation somebody else was having and asked for exactly one thing:
@@ -57,7 +67,7 @@ Your entire output must be exactly one of these:
 
 When in doubt about whether a concrete user-requested item remains unresolved, continue. When ChatGPT explicitly says the entire requested job is done and all requested questions are answered, stop.`;
 
-export const DEFAULT_GOAL_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the meta-prompter sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
+export const PRE_PERMISSION_DEFAULT_GOAL_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the meta-prompter sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
 
 Here is the exact situation. A real person was working with ChatGPT. Their conversation is pasted below this instruction: the messages labelled "user" are that person's own requests, the messages labelled "assistant" are ChatGPT's answers. The person has stepped away and you now type for them. Nobody handed you a separate goal, so the goal is whatever that person already asked for in the conversation itself. Read it out of their own messages.
 
@@ -102,6 +112,9 @@ Your entire output is exactly one of these:
 
 Nothing else, ever.`;
 
+export const DEFAULT_GOAL_SYSTEM_PROMPT =
+  `${PRE_PERMISSION_DEFAULT_GOAL_SYSTEM_PROMPT}\n\n${GOAL_AUTHORIZATION_BOUNDARY}`;
+
 /**
  * Every default this app has ever shipped for the gate, oldest first.
  *
@@ -111,7 +124,8 @@ Nothing else, ever.`;
  */
 export const SUPERSEDED_GOAL_SYSTEM_PROMPTS: readonly string[] = [
   PREVIOUS_DEFAULT_GOAL_SYSTEM_PROMPT,
-  SUPERSEDED_EAGER_GATE_PROMPT
+  SUPERSEDED_EAGER_GATE_PROMPT,
+  PRE_PERMISSION_DEFAULT_GOAL_SYSTEM_PROMPT
 ];
 
 /** The driver default shipped before the requirements rewrite, kept only so it can migrate. */
@@ -170,7 +184,7 @@ Nothing else, ever.`;
  * Same fence as the gate's list above: exact equality means the owner never touched it, so it
  * is moved forward; one changed character keeps their wording forever.
  */
-export const SUPERSEDED_GOAL_OBJECTIVE_SYSTEM_PROMPTS: readonly string[] = [
+const EARLIER_GOAL_OBJECTIVE_SYSTEM_PROMPTS: readonly string[] = [
   PREVIOUS_DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT
 ];
 
@@ -193,7 +207,7 @@ export const SUPERSEDED_GOAL_OBJECTIVE_SYSTEM_PROMPTS: readonly string[] = [
  * disagrees with it, and explicitly licenses a long, concrete message — the user's register
  * governs how it is written, never how much of the requirement is carried.
  */
-export const DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the meta-prompter sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
+export const PRE_PERMISSION_DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the meta-prompter sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
 
 Here is the exact situation. A person has a goal, and they have handed you the wheel to reach it. Their goal is stated verbatim in the system message that follows these examples. Below that comes the conversation so far: the messages labelled "user" are yours to write, the messages labelled "assistant" are ChatGPT's answers. You keep prompting ChatGPT until that goal is actually reached, and you stop the moment it is.
 
@@ -251,6 +265,14 @@ Your entire output is exactly one of these:
 
 Nothing else, ever.`;
 
+export const DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT =
+  `${PRE_PERMISSION_DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT}\n\n${GOAL_AUTHORIZATION_BOUNDARY}`;
+
+export const SUPERSEDED_GOAL_OBJECTIVE_SYSTEM_PROMPTS: readonly string[] = [
+  ...EARLIER_GOAL_OBJECTIVE_SYSTEM_PROMPTS,
+  PRE_PERMISSION_DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT
+];
+
 /**
  * The closing reminders, appended *after* the transcript rather than before it.
  *
@@ -258,9 +280,9 @@ Nothing else, ever.`;
  * what it tends to obey. They stay compact and say nothing the instruction above has not
  * already said: the moves, which way to lean, and where the requirements are read from.
  */
-export const GOAL_SYSTEM_TRAILER = `That was the conversation. Now write the next message as the user: name what they asked for that is still not done, and tell ChatGPT to keep going. Answer exactly NO_REPLY only if everything they asked for is clearly finished and every question of theirs is answered. Lean towards continuing — a needless "keep going" costs one turn, a wrong stop abandons the job. Write in their language and register, and write nothing except that message.`;
+export const GOAL_SYSTEM_TRAILER = `That was the conversation. Now write the next message as the user: name what they asked for that is still not done, and tell ChatGPT to keep going. Answer exactly NO_REPLY only if everything they asked for is clearly finished and every question of theirs is answered. Lean towards continuing — a needless "keep going" costs one turn, a wrong stop abandons the job. ${GOAL_AUTHORIZATION_TRAILER} Write in their language and register, and write nothing except that message.`;
 
-export const GOAL_OBJECTIVE_TRAILER = `That was the conversation. Now write the next message as the user. Read the goal above again first: the goal is the requirements, ChatGPT's account of it is not. Name the parts of the goal that are still not done and spell out what you want in the goal's own words, concretely, at whatever length that takes — never a bare "keep going". Answer exactly NO_REPLY only if the goal is completely reached — every part actually done, not planned, promised or described. Be eager: when in doubt, keep going. Never ask for anything the goal does not ask for. Write in the user's language and register, and write nothing except that message.`;
+export const GOAL_OBJECTIVE_TRAILER = `That was the conversation. Now write the next message as the user. Read the goal above again first: the goal is the requirements, ChatGPT's account of it is not. Name the parts of the goal that are still not done and spell out what you want in the goal's own words, concretely, at whatever length that takes — never a bare "keep going". Answer exactly NO_REPLY only if the goal is completely reached — every part actually done, not planned, promised or described. Be eager: when in doubt, keep going. Never ask for anything the goal does not ask for. ${GOAL_AUTHORIZATION_TRAILER} Write in the user's language and register, and write nothing except that message.`;
 
 /** The loop default shipped before the requirements rewrite, kept only so it can migrate. */
 export const PREVIOUS_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the loop sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
@@ -308,7 +330,7 @@ You write: "leave that test for now. the whole job is scraper, csv export, sched
 Your entire output is exactly one thing: the next user message. Never NO_REPLY, never an empty message, never anything else.`;
 
 /** Every default this app has ever shipped for the loop, oldest first. Same fence as the others. */
-export const SUPERSEDED_GOAL_LOOP_SYSTEM_PROMPTS: readonly string[] = [
+const EARLIER_GOAL_LOOP_SYSTEM_PROMPTS: readonly string[] = [
   PREVIOUS_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT
 ];
 
@@ -341,7 +363,7 @@ export const SUPERSEDED_GOAL_LOOP_SYSTEM_PROMPTS: readonly string[] = [
  * more precision, a higher standard. Never a different job. "Improve it" is a direction along the
  * user's own brief, not permission to start a second one.
  */
-export const DEFAULT_GOAL_LOOP_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the loop sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
+export const PRE_PERMISSION_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT = `Your job is to prompt ChatGPT. You are the loop sitting in the user's seat, and the only thing you ever produce is the next message that user would type.
 
 Here is the exact situation. A person has work they want finished, and they have handed you the wheel. If a goal is stated verbatim in a system message below, that goal is the work. If there is none, the work is whatever that person already asked for in the conversation itself — read it out of the messages labelled "user". The messages labelled "user" are yours to write from here on, the messages labelled "assistant" are ChatGPT's answers.
 
@@ -396,8 +418,16 @@ You write: "no dashboard, no rewrite, that's not the job. the csv still has no h
 
 Your entire output is exactly one thing: the next user message. Never NO_REPLY, never an empty message, never anything else.`;
 
+export const DEFAULT_GOAL_LOOP_SYSTEM_PROMPT =
+  `${PRE_PERMISSION_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT}\n\n${GOAL_AUTHORIZATION_BOUNDARY}`;
+
+export const SUPERSEDED_GOAL_LOOP_SYSTEM_PROMPTS: readonly string[] = [
+  ...EARLIER_GOAL_LOOP_SYSTEM_PROMPTS,
+  PRE_PERMISSION_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT
+];
+
 /** Loop's closing reminder, placed after the transcript for the same reason as the other two. */
-export const GOAL_LOOP_TRAILER = `That was the conversation. Now write the next message as the user. You must write one — stopping, silence and NO_REPLY do not exist here. Go back to the user's own requirements, not to ChatGPT's account of them, and carry them into your message in full: name what is still not done and spell out exactly what you want to see, at whatever length that takes. If everything looks finished, tell it to go over the whole thing again and raise the bar — deeper into the same requirements, more demanded each pass, never a different job. Write in the user's language and register, and write nothing except that message.`;
+export const GOAL_LOOP_TRAILER = `That was the conversation. Now write the next message as the user. You must write one — stopping, silence and NO_REPLY do not exist here. Go back to the user's own requirements, not to ChatGPT's account of them, and carry them into your message in full: name what is still not done and spell out exactly what you want to see, at whatever length that takes. If everything looks finished, tell it to go over the whole thing again and raise the bar — deeper into the same requirements, more demanded each pass, never a different job. ${GOAL_AUTHORIZATION_TRAILER} Write in the user's language and register, and write nothing except that message.`;
 
 /**
  * What the loop is told after it tried to stop anyway.
@@ -406,7 +436,7 @@ export const GOAL_LOOP_TRAILER = `That was the conversation. Now write the next 
  * model wrote the sentinel into the message text itself. The request is then simply made again
  * with this appended, rather than typing a sentence the model never wrote.
  */
-export const GOAL_LOOP_STOP_REFUSED = `Your previous answer tried to end the conversation. That is not available to you: this loop only ever writes the next user message. Write that message now — name what is still unfinished against the user's own requirements, or, if it all looks done, tell ChatGPT to go back over the whole job and raise the bar on it.`;
+export const GOAL_LOOP_STOP_REFUSED = `Your previous answer tried to end the conversation. That is not available to you: this loop only ever writes the next user message. Write that message now — name what is still unfinished against the user's own requirements, or, if it all looks done, tell ChatGPT to go back over the whole job and raise the bar on it. ${GOAL_AUTHORIZATION_TRAILER}`;
 
 /** How the goal itself is put to the model, kept beside the instruction that refers to it. */
 export function goalObjectiveMessage(objective: string): string {

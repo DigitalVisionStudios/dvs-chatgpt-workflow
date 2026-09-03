@@ -1877,6 +1877,35 @@ describe('a chat driven towards a specific goal', () => {
     expect(goal.goalObjectiveFor('c-obj-child')).toBe('finish the release unattended');
   });
 
+  it('moves the pending Goal reply obligation to the replacement chat on resume', async () => {
+    await goal.acceptGoalReplyNow({
+      conversationId: 'c-reply-parent',
+      sessionId: 'session-reply-parent',
+      replyId: 'assistant-reply-before-resume',
+      turnId: 'g-reply-before-resume',
+      eventSeq: 31,
+      blocked: false
+    });
+
+    expect(goal.goalPendingReplyFor('c-reply-parent')).toMatchObject({
+      replyId: 'assistant-reply-before-resume'
+    });
+    expect(await goal.moveGoalReplyNow('c-reply-parent', 'c-reply-child')).toBe(true);
+    expect(goal.goalPendingReplyFor('c-reply-parent')).toBeNull();
+    expect(goal.goalPendingReplyFor('c-reply-child')).toMatchObject({
+      replyId: 'assistant-reply-before-resume',
+      turnId: 'g-reply-before-resume',
+      eventSeq: 31
+    });
+
+    const saved = goal.snapshotGoalReplies();
+    goal.resetGoalStateForTests();
+    goal.restoreGoalReplies(saved);
+    expect(goal.goalPendingReplyFor('c-reply-child')).toMatchObject({
+      replyId: 'assistant-reply-before-resume'
+    });
+  });
+
   /**
    * A goal is a brief somebody writes, and it used to be cut at 4,000 characters — silently,
    * because the sheet reported back what was stored and the reader had no reason to count.

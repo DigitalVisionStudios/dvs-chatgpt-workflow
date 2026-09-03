@@ -467,6 +467,41 @@ export function pendingGoalReplies(
   return owed.sort((a, b) => b.acceptedAt - a.acceptedAt);
 }
 
+/**
+ * Moves the durable final-reply obligation with a Compact & Resume handover.
+ *
+ * Goal objectives and switches already move from chat A to chat B. The reply ledger must move at
+ * the same boundary or the first post-handover nudge remains keyed to the superseded chat and is
+ * lost. A destination row that was accepted later wins, but the stale source row is still retired.
+ *
+ * This uses the immediate durable writer because continuation commit is a transaction. If the
+ * ledger cannot be persisted, restore the exact in-memory snapshot and let continuation recovery
+ * retry rather than publishing half of the automation state.
+ */
+export async function moveGoalReplyNow(fromConversationId: string, toConversationId: string): Promise<boolean> {
+  if (fromConversationId === toConversationId) return false;
+  const source = goalReplies.get(fromConversationId);
+  if (!source) return false;
+
+  const before = [...goalReplies.values()].map((reply) => ({ ...reply }));
+  const target = goalReplies.get(toConversationId);
+  goalReplies.delete(fromConversationId);
+
+  if (!target || source.acceptedAt > target.acceptedAt) {
+    goalReplies.set(toConversationId, { ...source, conversationId: toConversationId });
+  }
+
+  try {
+    await writeDurableNow(GOAL_REPLIES_STATE, snapshotGoalReplies());
+  } catch (error) {
+    goalReplies.clear();
+    for (const reply of before) goalReplies.set(reply.conversationId, reply);
+    persistGoalRepliesSoon();
+    throw error;
+  }
+  return true;
+}
+
 /** Freezes Goal eligibility at the durable recorder boundary. */
 export async function acceptGoalReplyNow(input: {
   conversationId: string;

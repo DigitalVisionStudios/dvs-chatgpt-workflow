@@ -45,7 +45,7 @@ import { logInfo, logWarn } from './logger.js';
 import { APP_VERSION } from './version.js';
 import { isNewer, type UpdateStatus } from '../shared/types.js';
 
-const REPO = 'totec448-spec/chat-on-steroids';
+const REPO = 'DigitalVisionStudios/dvs-chatgpt-workflow';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 const CHECK_TIMEOUT_MS = 15_000;
@@ -58,6 +58,16 @@ const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
  * Six hours is slow enough to be invisible, and costs one request whenever there is nothing new.
  */
 const RECHECK_MS = 6 * 60 * 60_000;
+
+/**
+ * DVS fork security boundary.
+ *
+ * Automatic update scheduling is disabled. The updater engine itself remains available for
+ * explicit/manual use and regression tests, but every release URL it can reach is pinned to the
+ * DVS fork above. That preserves checksum/install coverage without allowing an installed DVS
+ * build to silently ingest a future upstream maintainer binary.
+ */
+const DVS_AUTOMATIC_UPDATES_DISABLED = true;
 
 /**
  * The artifact this exact installation can apply to itself, or null for one that cannot.
@@ -127,6 +137,10 @@ function set(next: Partial<UpdateStatus>): void {
  * alive, and the shutdown sequence does not have to know it exists.
  */
 export function startUpdateChecks(): void {
+  if (DVS_AUTOMATIC_UPDATES_DISABLED) {
+    logInfo('update: automatic updates are disabled in the DVS fork');
+    return;
+  }
   void checkForUpdates();
   setInterval(() => void checkForUpdates(), RECHECK_MS).unref();
 }

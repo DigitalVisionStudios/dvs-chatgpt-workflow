@@ -80,6 +80,9 @@ jobs:
           architecture: ${{ matrix.arch }}
           cache: npm
 
+      - name: Audit locked dependencies before install scripts
+        run: npm audit --package-lock-only
+
       - name: Install dependencies
         run: npm ci
 
