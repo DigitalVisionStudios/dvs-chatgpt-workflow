@@ -8,6 +8,7 @@
 
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { AppState, Capabilities, Config, Diagnosis, LogEntry } from '../shared/types.js';
+import type { DvsQueueStore, DvsThreadQueue } from '../shared/dvs-queue.js';
 import type {
   Handoff,
   SessionEvent,
@@ -86,6 +87,14 @@ const api = {
   writeClipboard: (text: string) => call<boolean>('clipboard:write', { text }),
   openLink: (url: string) => call<boolean>('link:open', { url }),
 
+  getDvsQueue: (conversationId: string) => call<DvsThreadQueue | null>('dvsQueue:get', { conversationId }),
+  enqueueDvsQueue: (conversationId: string, texts: string[]) =>
+    call<DvsThreadQueue>('dvsQueue:enqueue', { conversationId, texts }),
+  pauseDvsQueue: (conversationId: string) => call<DvsThreadQueue | null>('dvsQueue:pause', { conversationId }),
+  resumeDvsQueue: (conversationId: string) => call<DvsThreadQueue | null>('dvsQueue:resume', { conversationId }),
+  stopActiveDvsQueue: (conversationId: string) =>
+    call<DvsThreadQueue | null>('dvsQueue:stopActive', { conversationId }),
+
   // Sessions, compaction and the browser bridge. Everything here is read-only or a
   // named action; there is still no channel that takes a path or a command.
   listSessions: (options?: { cursor?: SessionListCursor; limit?: number }) =>
@@ -133,6 +142,11 @@ const api = {
     const wrapped = (_event: unknown, state: SwarmState): void => listener(state);
     ipcRenderer.on('swarm:changed', wrapped);
     return () => ipcRenderer.removeListener('swarm:changed', wrapped);
+  },
+  onDvsQueueChanged: (listener: (state: DvsQueueStore) => void): (() => void) => {
+    const wrapped = (_event: unknown, state: DvsQueueStore): void => listener(state);
+    ipcRenderer.on('dvsQueue:changed', wrapped);
+    return () => ipcRenderer.removeListener('dvsQueue:changed', wrapped);
   }
 };
 

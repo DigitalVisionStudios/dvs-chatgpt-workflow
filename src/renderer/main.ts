@@ -343,7 +343,7 @@ function paintDesktopAccess(next: AppState): void {
 
   $('desktopAccessTitle').textContent = 'Desktop access needs attention';
   $('desktopAccessDetail').textContent =
-    `${missing.join(' · ')}. These are live verdicts from the native backend executing inside Chat On Steroids. ` +
+    `${missing.join(' · ')}. These are live verdicts from the native backend executing inside DVS ChatGPT Workflow. ` +
     'Grant the missing macOS permission, then fully quit and reopen the app.';
   $<HTMLButtonElement>('openDesktopScreen').hidden =
     !needsScreen || access.screen === 'granted';
@@ -726,12 +726,12 @@ function updateSummary({ bridge, update }: AppState): { text: string; tone: Upda
     // is not one the app can update by itself. That is when the button matters.
     lines.push(
       update.stage === 'ready'
-        ? `Chat On Steroids ${update.latest} is downloaded and installs the next time you start the app.`
+        ? `DVS ChatGPT Workflow ${update.latest} is downloaded and installs the next time you start the app.`
         : update.stage === 'downloading'
-          ? `Chat On Steroids ${update.latest} is downloading. Keep working; it installs on your next start.`
+          ? `DVS ChatGPT Workflow ${update.latest} is downloading. Keep working; it installs on your next start.`
           : update.stage === 'failed'
-            ? `Chat On Steroids ${update.latest} could not be downloaded: ${update.error ?? 'the download stopped'}.`
-            : `Chat On Steroids ${update.latest} is out. This installation has to be updated by hand.`
+            ? `DVS ChatGPT Workflow ${update.latest} could not be downloaded: ${update.error ?? 'the download stopped'}.`
+            : `DVS ChatGPT Workflow ${update.latest} is out. This installation has to be updated by hand.`
     );
     if (update.stage === 'failed') tone = 'bad';
   } else if (update.stage === 'failed') {
@@ -741,7 +741,7 @@ function updateSummary({ bridge, update }: AppState): { text: string; tone: Upda
     lines.push('Checking for a newer version…');
   } else if (!stale) {
     const extension = bridge.present && bridge.extensionVersion ? ` · extension ${bridge.extensionVersion}` : '';
-    lines.push(`Up to date! Chat On Steroids ${update.current}${extension}`);
+    lines.push(`Up to date! DVS ChatGPT Workflow ${update.current}${extension}`);
     tone = 'ok';
   }
   if (stale) {

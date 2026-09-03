@@ -1,11 +1,11 @@
 {
-  "name": "chat-on-steroids",
+  "name": "dvs-chatgpt-workflow",
   "version": "2.0.3",
-  "description": "Local coding bridge for ChatGPT over MCP, with native desktop control and approved-folder capability limits.",
+  "description": "Durable DVS workflow desktop for ChatGPT queues, loops, rollover, local tools and automation.",
   "license": "MIT",
-  "author": "Chat On Steroids",
+  "author": "Digital Vision Studios",
   "homepage": "https://github.com/DigitalVisionStudios/dvs-chatgpt-workflow",
-  "desktopName": "com.chatonsteroids.app.desktop",
+  "desktopName": "com.digitalvisionstudios.dvs-chatgpt-workflow.desktop",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
