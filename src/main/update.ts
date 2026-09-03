@@ -62,11 +62,12 @@ const RECHECK_MS = 6 * 60 * 60_000;
 /**
  * DVS fork security boundary.
  *
- * Production and normal development builds must never ingest binaries from the upstream
- * maintainer automatically. The old updater remains testable so upstream updater regressions
- * can still be evaluated when merging, but a packaged DVS build is hard-disabled here.
+ * Automatic update scheduling is disabled. The updater engine itself remains available for
+ * explicit/manual use and regression tests, but every release URL it can reach is pinned to the
+ * DVS fork above. That preserves checksum/install coverage without allowing an installed DVS
+ * build to silently ingest a future upstream maintainer binary.
  */
-const DVS_UPSTREAM_UPDATES_DISABLED = app.isPackaged || process.env.NODE_ENV !== 'test';
+const DVS_AUTOMATIC_UPDATES_DISABLED = true;
 
 /**
  * The artifact this exact installation can apply to itself, or null for one that cannot.
@@ -136,8 +137,8 @@ function set(next: Partial<UpdateStatus>): void {
  * alive, and the shutdown sequence does not have to know it exists.
  */
 export function startUpdateChecks(): void {
-  if (DVS_UPSTREAM_UPDATES_DISABLED) {
-    logInfo('update: upstream automatic updates are disabled in the DVS fork');
+  if (DVS_AUTOMATIC_UPDATES_DISABLED) {
+    logInfo('update: automatic updates are disabled in the DVS fork');
     return;
   }
   void checkForUpdates();
@@ -151,7 +152,6 @@ export function startUpdateChecks(): void {
  * from downloading the same installer twice.
  */
 export function checkForUpdates(): Promise<void> {
-  if (DVS_UPSTREAM_UPDATES_DISABLED) return Promise.resolve();
   if (pass) return pass;
   const run = runPass()
     .catch((err: Error) => {
@@ -299,10 +299,6 @@ async function download(version: string, name: string): Promise<string> {
  * rename gives the new build a new inode and leaves the old one alive until it exits.
  */
 export async function applyStagedUpdate(): Promise<void> {
-  if (DVS_UPSTREAM_UPDATES_DISABLED) {
-    staged = null;
-    return;
-  }
   const ready = staged;
   staged = null;
   if (!ready) return;

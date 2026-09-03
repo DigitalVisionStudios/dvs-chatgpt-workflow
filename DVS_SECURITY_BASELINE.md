@@ -13,7 +13,7 @@ The DVS fork is built from reviewed source. Upstream prebuilt installers are not
 
 ### Automatic updates
 
-Upstream automatic release ingestion is disabled in packaged DVS builds and normal development builds. The original updater remains executable only under the test environment so upstream updater tests can still be run when evaluating merges.
+Automatic update scheduling is disabled in the DVS fork. The updater engine remains available for explicit/manual use and regression tests, but its release API, checksum manifest, installers, and extension recovery URLs all target only `DigitalVisionStudios/dvs-chatgpt-workflow`, never the upstream maintainer repository.
 
 ### Fresh-install permissions
 
