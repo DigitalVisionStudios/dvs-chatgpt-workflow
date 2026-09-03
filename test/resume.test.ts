@@ -38,6 +38,7 @@ const { flushDurable, initDurableStore, readDurable, writeDurableSoon } = durabl
 const { getSession, initSessionStore, resetSessionStoreForTests } = await import('../src/main/session/store.js');
 const { resetRecorderForTests, sessionForConversation } = await import('../src/main/session/recorder.js');
 const { resetSwarm } = await import('../src/main/agents.js');
+const { goalPendingReplyFor, resetGoalStateForTests, restoreGoalReplies } = await import('../src/main/goal.js');
 const {
   CONTINUATIONS_STATE,
   restoreContinuations
@@ -169,6 +170,7 @@ afterAll(async () => {
 beforeEach(async () => {
   resetBridgeForTests();
   resetRecorderForTests();
+  resetGoalStateForTests();
   resetSessionStoreForTests();
   // Each case models one independent app history. Reusing CHAT_A/CHAT_B while retaining
   // prior cases on disk hid duplicate-target ownership bugs and made the safe rebind check
@@ -190,6 +192,20 @@ describe('the whole move, when it works', () => {
   it('carries the same local session from chat A to chat B and only then retires A', async () => {
     await connect();
     const sessionId = await record();
+    restoreGoalReplies({
+      version: 1,
+      savedAt: Date.now(),
+      replies: [{
+        conversationId: CHAT_A,
+        sessionId,
+        replyId: 'assistant-before-rollover',
+        turnId: 'goal-turn-before-rollover',
+        eventSeq: 17,
+        acceptedAt: Date.now(),
+        state: 'pending'
+      }]
+    });
+    expect(goalPendingReplyFor(CHAT_A)).toMatchObject({ replyId: 'assistant-before-rollover' });
     const { token: continuation, prompt } = await press();
     // The instruction asks for the brief as the answer. There is no tool for the model to
     // call, which is the point: an answer cannot be retried into three different briefs.
@@ -223,6 +239,14 @@ describe('the whole move, when it works', () => {
     expect(await sessionForConversation(CHAT_B)).toBe(sessionId);
     // A is historical: it is in the lineage, and it no longer resolves to the live session.
     expect(await sessionForConversation(CHAT_A)).not.toBe(sessionId);
+    // The final assistant reply that still owed Goal/Loop one decision moves with the same
+    // handover. Losing this row is the rollover bug that made the first nudge disappear in B.
+    expect(goalPendingReplyFor(CHAT_A)).toBeNull();
+    expect(goalPendingReplyFor(CHAT_B)).toMatchObject({
+      replyId: 'assistant-before-rollover',
+      turnId: 'goal-turn-before-rollover',
+      eventSeq: 17
+    });
     // And exactly one brief was ever written for it.
     expect(await sessionHandoffCount(sessionId)).toBe(1);
   });

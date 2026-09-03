@@ -6396,7 +6396,11 @@ describe('the goal loop over the bridge', () => {
 
       await vi.advanceTimersByTimeAsync(40 * 60_000);
       await sweepStaleSwarm(Date.now());
-      expect((await request('GET', '/status')).body.repairs).toEqual([]);
+      const repairs = (await request('GET', '/status')).body.repairs;
+      expect(repairs).not.toContainEqual(expect.objectContaining({ conversationId: from }));
+      expect(repairs).toEqual([
+        expect.objectContaining({ conversationId: to, reason: 'goal' })
+      ]);
     } finally {
       vi.useRealTimers();
     }

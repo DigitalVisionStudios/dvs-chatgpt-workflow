@@ -63,7 +63,16 @@ import {
   thawPrimeTransfer
 } from '../agents.js';
 import { clearChatWorkspace, moveChatWorkspace, workspaceForChat } from '../workspace.js';
-import { clearGoalObjective, clearGoalSwitch, goalObjectiveFor, goalSwitchFor, moveGoalObjective, moveGoalSwitch } from '../goal.js';
+import {
+  clearGoalObjective,
+  clearGoalSwitch,
+  goalObjectiveFor,
+  goalPendingReplyFor,
+  goalSwitchFor,
+  moveGoalObjective,
+  moveGoalReplyNow,
+  moveGoalSwitch
+} from '../goal.js';
 import { writeDurableNow, writeDurableSoon } from '../durable.js';
 import { prepareHandoff, resumeBootstrapMatches } from './handoff.js';
 import { ensureHandoffRecorded, recordHandoff, recordNote, rebindConversation } from './recorder.js';
@@ -521,7 +530,12 @@ export async function repairPrimeFromResumeShadow(conversationId: string): Promi
   // recovery hook deliberately reports an already-satisfied A→B as success, so calling it again
   // would otherwise turn every /activity poll into another "moved missing projections" warning
   // (and another exact-handoff event scan) forever on resumed chats that have no Goal.
-  if (targetOwner === PRIME_ID && !workspaceForChat(fromConversationId) && !goalObjectiveFor(fromConversationId)) {
+  if (
+    targetOwner === PRIME_ID &&
+    !workspaceForChat(fromConversationId) &&
+    !goalObjectiveFor(fromConversationId) &&
+    !goalPendingReplyFor(fromConversationId)
+  ) {
     return false;
   }
   const failed = [...byToken.values()].find(
@@ -564,7 +578,8 @@ export async function repairPrimeFromResumeShadow(conversationId: string): Promi
   if (
     currentTargetOwner === PRIME_ID &&
     !workspaceForChat(fromConversationId) &&
-    !goalObjectiveFor(fromConversationId)
+    !goalObjectiveFor(fromConversationId) &&
+    !goalPendingReplyFor(fromConversationId)
   ) {
     return false;
   }
@@ -596,6 +611,7 @@ export async function repairPrimeFromResumeShadow(conversationId: string): Promi
   // and leaving the override behind would silently hand B back to the app-wide setting.
   if (goalSwitchFor(conversationId).own) clearGoalSwitch(fromConversationId);
   else if (moveGoalSwitch(fromConversationId, conversationId)) goalChanged = true;
+  if (await moveGoalReplyNow(fromConversationId, conversationId)) goalChanged = true;
   // The recovery hook uses success semantics: replaying an already-repaired target returns true
   // by design. Here this boolean means "changed on this call" and drives a user-visible warning,
   // so an already-owned target must not be counted as a fresh broker mutation. Missing Goal or
@@ -1013,15 +1029,16 @@ export async function claimContinuationNow(token: string, claimant: string): Pro
   return { summary: entry.summary };
 }
 
-function publishCommittedProjection(
+async function publishCommittedProjection(
   entry: Continuation,
   toConversationId: string,
   swarm: 'absent' | 'frozen' | 'recovery'
-): void {
+): Promise<void> {
   rebindConversation(entry.sessionId, entry.from, toConversationId);
   moveChatWorkspace(entry.from, toConversationId);
   moveGoalObjective(entry.from, toConversationId);
   moveGoalSwitch(entry.from, toConversationId);
+  await moveGoalReplyNow(entry.from, toConversationId);
   if (swarm === 'frozen') {
     if (!commitPrimeTransfer(entry.from, toConversationId)) {
       // The frozen handover cannot expire. A miss here means the run ended outright while
@@ -1099,7 +1116,14 @@ async function reconcileCommitting(entry: Continuation, toConversationId: string
         };
       }
     }
-    publishCommittedProjection(entry, toConversationId, 'recovery');
+    try {
+      await publishCommittedProjection(entry, toConversationId, 'recovery');
+    } catch (err) {
+      return {
+        status: 'retryable',
+        reason: `the committed automation projection could not be repaired: ${err instanceof Error ? err.message : String(err)}`
+      };
+    }
     await finishCommittedRecord(entry, toConversationId);
     return { status: 'already-committed', conversationId: toConversationId };
   }
@@ -1165,7 +1189,14 @@ async function reconcileCommitting(entry: Continuation, toConversationId: string
           };
         }
       }
-      publishCommittedProjection(entry, toConversationId, swarm === 'frozen' ? 'frozen' : 'absent');
+      try {
+        await publishCommittedProjection(entry, toConversationId, swarm === 'frozen' ? 'frozen' : 'absent');
+      } catch (err) {
+        return {
+          status: 'retryable',
+          reason: `the committed automation projection could not be published: ${err instanceof Error ? err.message : String(err)}`
+        };
+      }
       await finishCommittedRecord(entry, toConversationId);
       return { status: 'committed', conversationId: toConversationId };
     }
@@ -1187,7 +1218,14 @@ async function reconcileCommitting(entry: Continuation, toConversationId: string
   }
 
   // --- publish. Total map work only, after the authoritative durable attachment says B.
-  publishCommittedProjection(entry, toConversationId, swarm === 'frozen' ? 'frozen' : 'absent');
+  try {
+    await publishCommittedProjection(entry, toConversationId, swarm === 'frozen' ? 'frozen' : 'absent');
+  } catch (err) {
+    return {
+      status: 'retryable',
+      reason: `the committed automation projection could not be published: ${err instanceof Error ? err.message : String(err)}`
+    };
+  }
   await finishCommittedRecord(entry, toConversationId);
   logInfo(
     `continuation ${entry.token.slice(0, 8)} committed: session ${entry.sessionId} is now chat ${toConversationId}`
@@ -1463,12 +1501,15 @@ export async function restoreContinuations(snapshot: ContinuationSnapshot | null
             );
           }
         }
-        rebindConversation(entry.sessionId, entry.from, entry.to);
-        moveChatWorkspace(entry.from, entry.to);
-        moveGoalObjective(entry.from, entry.to);
-        moveGoalSwitch(entry.from, entry.to);
-        const repaired = recoveryHooks.repairPrimeTransfer?.(entry.from, entry.to) ?? false;
-        if (!repaired) commitPrimeTransfer(entry.from, entry.to);
+        try {
+          await publishCommittedProjection(entry, entry.to, 'recovery');
+        } catch (err) {
+          // The durable session already proves B owns the continuation. Keep this WAL row so a
+          // later startup can retry the missing automation projection instead of losing a nudge.
+          entry.error = `committed automation projection repair failed: ${err instanceof Error ? err.message : String(err)}`;
+          logWarn(`continuation ${entry.token.slice(0, 8)} ${entry.error}`);
+          continue;
+        }
         entry.state = 'committed';
         entry.error = null;
         logInfo(`continuation ${entry.token.slice(0, 8)} recovered after durable commit`);
