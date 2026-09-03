@@ -525,6 +525,47 @@ describe('the goal loop settings', () => {
     }
   });
 
+  it('ships and migrates the DVS authorization boundary for every automatic prompt mode', async () => {
+    const {
+      DEFAULT_GOAL_SYSTEM_PROMPT,
+      DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT,
+      DEFAULT_GOAL_LOOP_SYSTEM_PROMPT,
+      GOAL_AUTHORIZATION_BOUNDARY,
+      GOAL_SYSTEM_TRAILER,
+      GOAL_OBJECTIVE_TRAILER,
+      GOAL_LOOP_TRAILER,
+      GOAL_LOOP_STOP_REFUSED,
+      PRE_PERMISSION_DEFAULT_GOAL_SYSTEM_PROMPT,
+      PRE_PERMISSION_DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT,
+      PRE_PERMISSION_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT,
+      SUPERSEDED_GOAL_SYSTEM_PROMPTS,
+      SUPERSEDED_GOAL_OBJECTIVE_SYSTEM_PROMPTS,
+      SUPERSEDED_GOAL_LOOP_SYSTEM_PROMPTS
+    } = await import('../src/shared/goal.js');
+
+    for (const prompt of [
+      DEFAULT_GOAL_SYSTEM_PROMPT,
+      DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT,
+      DEFAULT_GOAL_LOOP_SYSTEM_PROMPT
+    ]) {
+      expect(prompt).toContain(GOAL_AUTHORIZATION_BOUNDARY);
+      expect(prompt).toMatch(/uncertainty is never permission/i);
+    }
+    for (const trailer of [
+      GOAL_SYSTEM_TRAILER,
+      GOAL_OBJECTIVE_TRAILER,
+      GOAL_LOOP_TRAILER,
+      GOAL_LOOP_STOP_REFUSED
+    ]) {
+      expect(trailer).toMatch(/do not invent authorization/i);
+      expect(trailer).toMatch(/irreversible/i);
+    }
+
+    expect(SUPERSEDED_GOAL_SYSTEM_PROMPTS).toContain(PRE_PERMISSION_DEFAULT_GOAL_SYSTEM_PROMPT);
+    expect(SUPERSEDED_GOAL_OBJECTIVE_SYSTEM_PROMPTS).toContain(PRE_PERMISSION_DEFAULT_GOAL_OBJECTIVE_SYSTEM_PROMPT);
+    expect(SUPERSEDED_GOAL_LOOP_SYSTEM_PROMPTS).toContain(PRE_PERMISSION_DEFAULT_GOAL_LOOP_SYSTEM_PROMPT);
+  });
+
   it('keeps a customized driver or loop prompt that merely starts like a shipped one', async () => {
     const { SUPERSEDED_GOAL_OBJECTIVE_SYSTEM_PROMPTS, SUPERSEDED_GOAL_LOOP_SYSTEM_PROMPTS } =
       await import('../src/shared/goal.js');
