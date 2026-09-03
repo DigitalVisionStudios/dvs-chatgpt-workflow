@@ -836,6 +836,7 @@ function retryWanted() {
   // prime sat unopened for good because nothing here thought it had a reason to ask.
   return (
     token !== null ||
+    (pairingError !== null && pairingError.error === 'pairing_approval_required') ||
     journal.length > 0 ||
     closeOutbox.length > 0 ||
     commandAckOutbox.length > 0 ||
@@ -1043,6 +1044,7 @@ function provision(reconnect = false) {
           error: result && result.error ? String(result.error) : 'pair_failed',
           message: result && result.message ? String(result.message) : ''
         };
+    if (pairingError?.error === 'pairing_approval_required') scheduleRetry();
     return result;
   });
   const tracked = work.finally(() => {

@@ -170,7 +170,7 @@ async function boot(events: SessionEvent[]) {
     hasGoalKey: false,
     resolvedBinary: null,
     bundledTunnelVersion: null,
-    bridge: { running: true, port: 8765, paired: false, present: false, lastSeenAt: null, extensionVersion: null },
+    bridge: { running: true, port: 8765, paired: false, present: false, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: null, extensionVersion: null },
     update: { current: '2.0.3', latest: null, stage: 'idle', error: null, checkedAt: null }
   };
   const ok = (data: any) => Promise.resolve({ ok: true, data });

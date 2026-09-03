@@ -30,6 +30,7 @@ import { hasSecret, isEncryptionAvailable, secureStorageStatus, setSecret } from
 import { bundledVersion, locateBinary } from './tunnel/locate.js';
 import { TUNNEL_ID_PATTERN } from './tunnel/index.js';
 import {
+  approvePairing,
   bridgeStatus,
   cancelWorkerCommands,
   chatUrl,
@@ -680,6 +681,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   });
 
   // ---------------------------------------------------------------- bridge
+
+  handle('bridge:approvePairing', async () => {
+    approvePairing();
+    return buildState();
+  });
 
   handle('bridge:unpair', async () => {
     await unpair();

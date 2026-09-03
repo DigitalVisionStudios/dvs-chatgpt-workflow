@@ -399,6 +399,10 @@ export interface BridgeStatus {
   paired: boolean;
   /** Live presence: true only while this app process has heard from the extension recently. */
   present: boolean;
+  /** Epoch ms when an extension most recently requested pairing and is waiting for app approval. */
+  pairingRequestedAt: number | null;
+  /** Epoch ms until which the pending pairing request is approved. Approval is consumed on mint. */
+  pairingApprovalExpiresAt: number | null;
   /** Epoch ms of the last message from the extension, or null. */
   lastSeenAt: number | null;
   /**

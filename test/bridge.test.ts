@@ -32,6 +32,7 @@ const { safeStorage } = await import('electron');
 const { defaultConfig, getConfig, initConfigPath, saveConfig } = await import('../src/main/config.js');
 const { initSecretsPath, resetSecretsCacheForTests, setSecret } = await import('../src/main/secrets.js');
 const {
+  approvePairing,
   bridgePort,
   bridgeStatus,
   cancelResume,
@@ -278,9 +279,18 @@ async function redeem(id?: string, client = 'tab-1'): Promise<any> {
 let suiteConfig: Config;
 
 async function pair(): Promise<string> {
+  const pending = await request('POST', '/pair', { auth: null });
+  expect(pending.status).toBe(409);
+  expect(pending.body.error).toBe('pairing_approval_required');
+  expect((await bridgeStatus()).pairingRequestedAt).not.toBeNull();
+
+  approvePairing();
+  expect((await bridgeStatus()).pairingApprovalExpiresAt).not.toBeNull();
+
   const reply = await request('POST', '/pair', { auth: null });
   expect(reply.status).toBe(200);
   token = reply.body.token as string;
+  expect((await bridgeStatus()).pairingApprovalExpiresAt).toBeNull();
   return token;
 }
 
@@ -393,12 +403,34 @@ describe('who is allowed to talk to it', () => {
 // -------------------------------------------------------------- provisioning
 
 describe('provisioning', () => {
-  it('issues a token to the extension with nothing for the user to type', async () => {
+  it('requires trusted-app approval before issuing a token to the extension', async () => {
+    const pending = await request('POST', '/pair', { auth: null });
+    expect(pending.status).toBe(409);
+    expect(pending.body.error).toBe('pairing_approval_required');
+    expect(pending.body.token).toBeUndefined();
+    expect(await bridgeStatus()).toMatchObject({
+      paired: false,
+      pairingRequestedAt: expect.any(Number),
+      pairingApprovalExpiresAt: null
+    });
+
+    approvePairing();
+    expect((await bridgeStatus()).pairingApprovalExpiresAt).toBeGreaterThan(Date.now());
+
     const reply = await request('POST', '/pair', { auth: null });
     expect(reply.status).toBe(200);
     expect(reply.body.token).toMatch(/^[A-Za-z0-9_-]{32,}$/);
+    expect(await bridgeStatus()).toMatchObject({
+      paired: true,
+      pairingRequestedAt: null,
+      pairingApprovalExpiresAt: null
+    });
     const hello = await request('GET', '/hello', { auth: null });
     expect(hello.body.paired).toBe(true);
+  });
+
+  it('refuses app approval when no browser pairing request is waiting', () => {
+    expect(() => approvePairing()).toThrow(/no browser pairing request/i);
   });
 
   it('starts and stays usable while secure storage is unavailable, then pairs after it returns', async () => {
@@ -421,6 +453,10 @@ describe('provisioning', () => {
     // Keychain/Secret Service can become available after login/unlock without the app or bridge
     // restarting. The listener must recover in place rather than being poisoned by the first read.
     vi.mocked(safeStorage.isAsyncEncryptionAvailable).mockResolvedValue(true);
+    const waiting = await request('POST', '/pair', { auth: null });
+    expect(waiting.status).toBe(409);
+    expect(waiting.body.error).toBe('pairing_approval_required');
+    approvePairing();
     const paired = await request('POST', '/pair', { auth: null });
     expect(paired.status).toBe(200);
     expect(paired.body.token).toMatch(/^[A-Za-z0-9_-]{32,}$/);
@@ -469,8 +505,12 @@ describe('provisioning', () => {
       disconnected: true
     });
 
-    // The extension popup's Connect action is the explicit counterpart. Only that intent
-    // clears the durable app-side latch and mints a usable token again.
+    // The extension popup can request a reconnect, but DVS still requires the trusted app to
+    // approve the new credential before the durable latch is cleared.
+    const waiting = await request('POST', '/pair', { auth: null, body: { reconnect: true } });
+    expect(waiting.status).toBe(409);
+    expect(waiting.body.error).toBe('pairing_approval_required');
+    approvePairing();
     const reconnect = await request('POST', '/pair', { auth: null, body: { reconnect: true } });
     expect(reconnect.status).toBe(200);
     token = reconnect.body.token as string;
