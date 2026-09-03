@@ -45,7 +45,7 @@ import { logInfo, logWarn } from './logger.js';
 import { APP_VERSION } from './version.js';
 import { isNewer, type UpdateStatus } from '../shared/types.js';
 
-const REPO = 'totec448-spec/chat-on-steroids';
+const REPO = 'DigitalVisionStudios/dvs-chatgpt-workflow';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
 const CHECK_TIMEOUT_MS = 15_000;
@@ -58,6 +58,15 @@ const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
  * Six hours is slow enough to be invisible, and costs one request whenever there is nothing new.
  */
 const RECHECK_MS = 6 * 60 * 60_000;
+
+/**
+ * DVS fork security boundary.
+ *
+ * Production and normal development builds must never ingest binaries from the upstream
+ * maintainer automatically. The old updater remains testable so upstream updater regressions
+ * can still be evaluated when merging, but a packaged DVS build is hard-disabled here.
+ */
+const DVS_UPSTREAM_UPDATES_DISABLED = app.isPackaged || process.env.NODE_ENV !== 'test';
 
 /**
  * The artifact this exact installation can apply to itself, or null for one that cannot.
@@ -127,6 +136,10 @@ function set(next: Partial<UpdateStatus>): void {
  * alive, and the shutdown sequence does not have to know it exists.
  */
 export function startUpdateChecks(): void {
+  if (DVS_UPSTREAM_UPDATES_DISABLED) {
+    logInfo('update: upstream automatic updates are disabled in the DVS fork');
+    return;
+  }
   void checkForUpdates();
   setInterval(() => void checkForUpdates(), RECHECK_MS).unref();
 }
@@ -138,6 +151,7 @@ export function startUpdateChecks(): void {
  * from downloading the same installer twice.
  */
 export function checkForUpdates(): Promise<void> {
+  if (DVS_UPSTREAM_UPDATES_DISABLED) return Promise.resolve();
   if (pass) return pass;
   const run = runPass()
     .catch((err: Error) => {
@@ -285,6 +299,10 @@ async function download(version: string, name: string): Promise<string> {
  * rename gives the new build a new inode and leaves the old one alive until it exits.
  */
 export async function applyStagedUpdate(): Promise<void> {
+  if (DVS_UPSTREAM_UPDATES_DISABLED) {
+    staged = null;
+    return;
+  }
   const ready = staged;
   staged = null;
   if (!ready) return;

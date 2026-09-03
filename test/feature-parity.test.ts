@@ -20,9 +20,9 @@ describe('portable browser-backed feature parity', () => {
       expect(config.goal).toEqual(windows.goal);
       expect(config.goal.enabled).toBe(false);
       expect(config.multiAgent).toEqual({
-        enabled: true,
+        enabled: false,
         maxWorkers: 2,
-        allowUnattributedCalls: true,
+        allowUnattributedCalls: false,
         recoverAgentTabs: false
       });
       expect(browserExtensionRequired(config)).toBe(true);

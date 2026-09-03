@@ -4,7 +4,7 @@
   "description": "Local coding bridge for ChatGPT over MCP, with native desktop control and approved-folder capability limits.",
   "license": "MIT",
   "author": "Chat On Steroids",
-  "homepage": "https://github.com/totec448-spec/chat-on-steroids",
+  "homepage": "https://github.com/DigitalVisionStudios/dvs-chatgpt-workflow",
   "desktopName": "com.chatonsteroids.app.desktop",
   "main": "out/main/index.js",
   "scripts": {
@@ -53,6 +53,10 @@
     "tree-sitter": "0.25.1",
     "tree-sitter-bash": "0.25.1",
     "zod": "^4.4.3"
+  },
+  "overrides": {
+    "fast-uri": "3.1.6",
+    "@xmldom/xmldom": "0.8.15"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
