@@ -63,6 +63,14 @@ import { tokenPressure } from '../shared/session.js';
 import { forgetWorkspaceRoot, renameWorkspaceRoot } from './workspace.js';
 import { hostPlatformInfo } from './platform.js';
 import { openInPreferredBrowser } from './browser.js';
+import {
+  dvsThreadQueue,
+  enqueueDvsQueue,
+  onDvsQueueChange,
+  pauseDvsQueue,
+  resumeDvsQueue,
+  stopDvsDispatch
+} from './dvs-queue.js';
 import { onUpdateChange, updateStatus } from './update.js';
 import {
   getMacOSDesktopAccess,
@@ -255,6 +263,11 @@ function mergeSettings(current: Config, base: SettingsSnapshot, wanted: Settings
 
 const sessionIdArg = z.object({ id: z.string().min(8).max(64).regex(/^[0-9a-z-]+$/i) });
 const agentIdArg = z.string().min(1).max(64).regex(/^[0-9a-z-]+$/i);
+const dvsConversationArg = z.object({ conversationId: z.string().trim().min(1).max(200) });
+const dvsEnqueueArg = z.object({
+  conversationId: z.string().trim().min(1).max(200),
+  texts: z.array(z.string().trim().min(1).max(20_000)).min(1).max(100)
+});
 
 const renameRoot = z.object({
   name: z.string().min(1).max(32),
@@ -315,6 +328,42 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     // secure-storage availability/decryption probes and the rest of the initial state snapshot.
     logInfo('renderer state ready');
     return state;
+  });
+
+  handle('dvsQueue:get', async (payload) => {
+    const { conversationId } = dvsConversationArg.parse(payload);
+    return dvsThreadQueue(conversationId);
+  });
+
+  handle('dvsQueue:enqueue', async (payload) => {
+    const { conversationId, texts } = dvsEnqueueArg.parse(payload);
+    return enqueueDvsQueue(conversationId, texts);
+  });
+
+  handle('dvsQueue:pause', async (payload) => {
+    const { conversationId } = dvsConversationArg.parse(payload);
+    const current = dvsThreadQueue(conversationId);
+    if (!current) return null;
+    await pauseDvsQueue(conversationId);
+    return dvsThreadQueue(conversationId);
+  });
+
+  handle('dvsQueue:resume', async (payload) => {
+    const { conversationId } = dvsConversationArg.parse(payload);
+    const current = dvsThreadQueue(conversationId);
+    if (!current) return null;
+    await resumeDvsQueue(conversationId);
+    return dvsThreadQueue(conversationId);
+  });
+
+  handle('dvsQueue:stopActive', async (payload) => {
+    const { conversationId } = dvsConversationArg.parse(payload);
+    const current = dvsThreadQueue(conversationId);
+    if (!current?.activeItemId) return current;
+    const active = current.items.find((item) => item.id === current.activeItemId);
+    if (!active?.dispatchId) return current;
+    await stopDvsDispatch(conversationId, active.id, active.dispatchId);
+    return dvsThreadQueue(conversationId);
   });
 
   handle('settings:save', async (payload) => {
@@ -784,4 +833,5 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   onLog((entry) => push('log:entry', entry));
   onSessionChange(() => push('session:changed'));
   onSwarmChange(() => push('swarm:changed', swarmState()));
+  onDvsQueueChange((snapshot) => push('dvsQueue:changed', snapshot));
 }

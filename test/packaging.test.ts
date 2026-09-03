@@ -139,38 +139,38 @@ describe('cross-platform packaging targets', () => {
     expect(matrix).toEqual([
       {
         name: 'Windows x64', platform: 'win32', arch: 'x64', runner: 'windows-2025',
-        script: 'dist:x64', artifact: 'package-windows-x64', files: 'release/Chat-On-Steroids-Setup-x64.exe'
+        script: 'dist:x64', artifact: 'package-windows-x64', files: 'release/DVS-ChatGPT-Workflow-Setup-x64.exe'
       },
       {
         name: 'Windows arm64', platform: 'win32', arch: 'arm64', runner: 'windows-11-arm',
-        script: 'dist:arm64', artifact: 'package-windows-arm64', files: 'release/Chat-On-Steroids-Setup-arm64.exe'
+        script: 'dist:arm64', artifact: 'package-windows-arm64', files: 'release/DVS-ChatGPT-Workflow-Setup-arm64.exe'
       },
       {
         name: 'macOS x64', platform: 'darwin', arch: 'x64', runner: 'macos-15-intel',
         script: 'dist:mac:x64', artifact: 'package-macos-x64',
-        files: 'release/Chat-On-Steroids-macOS-x64.dmg\nrelease/Chat-On-Steroids-macOS-x64.zip\n'
+        files: 'release/DVS-ChatGPT-Workflow-macOS-x64.dmg\nrelease/DVS-ChatGPT-Workflow-macOS-x64.zip\n'
       },
       {
         name: 'macOS arm64', platform: 'darwin', arch: 'arm64', runner: 'macos-15',
         script: 'dist:mac:arm64', artifact: 'package-macos-arm64',
-        files: 'release/Chat-On-Steroids-macOS-arm64.dmg\nrelease/Chat-On-Steroids-macOS-arm64.zip\n'
+        files: 'release/DVS-ChatGPT-Workflow-macOS-arm64.dmg\nrelease/DVS-ChatGPT-Workflow-macOS-arm64.zip\n'
       },
       {
         name: 'Linux x64', platform: 'linux', arch: 'x64', runner: 'ubuntu-24.04',
         script: 'dist:linux:x64', artifact: 'package-linux-x64',
-        files: 'release/Chat-On-Steroids-Linux-x64.AppImage\nrelease/Chat-On-Steroids-Linux-x64.deb\n'
+        files: 'release/DVS-ChatGPT-Workflow-Linux-x64.AppImage\nrelease/DVS-ChatGPT-Workflow-Linux-x64.deb\n'
       },
       {
         name: 'Linux arm64', platform: 'linux', arch: 'arm64', runner: 'ubuntu-24.04-arm',
         script: 'dist:linux:arm64', artifact: 'package-linux-arm64',
-        files: 'release/Chat-On-Steroids-Linux-arm64.AppImage\nrelease/Chat-On-Steroids-Linux-arm64.deb\n'
+        files: 'release/DVS-ChatGPT-Workflow-Linux-arm64.AppImage\nrelease/DVS-ChatGPT-Workflow-Linux-arm64.deb\n'
       }
     ]);
     expect(parsed.jobs.package['runs-on']).toBe('${{ matrix.runner }}');
-    expect(workflow).toContain('name: chat-on-steroids-candidate-${{ github.run_id }}');
+    expect(workflow).toContain('name: dvs-chatgpt-workflow-candidate-${{ github.run_id }}');
     expect(workflow).toContain('Install generated DEB on target distro');
     expect(workflow).toContain('Launch installed DEB normally under Xvfb');
-    expect(workflow).toContain('CLF_DEBUG=1 timeout --signal=TERM --kill-after=5s 12s xvfb-run -a /usr/bin/chat-on-steroids');
+    expect(workflow).toContain('CLF_DEBUG=1 timeout --signal=TERM --kill-after=5s 12s xvfb-run -a /usr/bin/dvs-chatgpt-workflow');
     expect(workflow).toContain('Execute generated static-runtime AppImage');
     expect(workflow).toContain('Verify generated macOS archives');
     expect(workflow).toContain('hdiutil verify "$dmg"');
@@ -180,8 +180,8 @@ describe('cross-platform packaging targets', () => {
     expect(workflow).toContain('test -L "$mount_dir/Applications"');
     expect(workflow).toContain('test "$(readlink "$mount_dir/Applications")" = /Applications');
     expect(workflow).toContain('ditto -x -k "$zip" "$zip_dir"');
-    expect(workflow).toContain("node scripts/smoke-macos-bundle.mjs '${{ matrix.arch }}' \"$mount_dir/Chat On Steroids.app\"");
-    expect(workflow).toContain("node scripts/smoke-macos-bundle.mjs '${{ matrix.arch }}' \"$zip_dir/Chat On Steroids.app\"");
+    expect(workflow).toContain("node scripts/smoke-macos-bundle.mjs '${{ matrix.arch }}' \"$mount_dir/DVS ChatGPT Workflow.app\"");
+    expect(workflow).toContain("node scripts/smoke-macos-bundle.mjs '${{ matrix.arch }}' \"$zip_dir/DVS ChatGPT Workflow.app\"");
     expect(workflow).toContain('Audit packaged macOS bundle metadata and Mach-O payloads');
     expect(workflow).toContain('node scripts/smoke-macos-bundle.mjs ${{ matrix.arch }}');
     expect(workflow).toContain('Launch packaged macOS app normally');
@@ -213,8 +213,8 @@ describe('cross-platform packaging targets', () => {
       workflow.indexOf('      - name: Execute generated static-runtime AppImage')
     );
     expect(workflow).toContain('sudo apt-get install -y --no-install-recommends xvfb xauth');
-    expect(workflow).toContain("grep -Fxq 'Name=Chat On Steroids' \"$desktop\"");
-    expect(workflow).toContain("grep -Fxq 'Icon=chat-on-steroids' \"$desktop\"");
+    expect(workflow).toContain("grep -Fxq 'Name=DVS ChatGPT Workflow' \"$desktop\"");
+    expect(workflow).toContain("grep -Fxq 'Icon=dvs-chatgpt-workflow' \"$desktop\"");
     expect(debGui).toContain('deb_smoke_root="$(mktemp -d)"');
     expect(debGui).toContain("trap 'rm -rf \"$deb_smoke_root\"' EXIT");
     expect(debGui).toContain('HOME="$deb_smoke_root/home"');
@@ -222,7 +222,7 @@ describe('cross-platform packaging targets', () => {
     expect(debGui).toContain('XDG_CACHE_HOME="$deb_smoke_root/cache"');
     expect(debGui).toContain('XDG_DATA_HOME="$deb_smoke_root/data"');
     expect(debGui).toContain('XDG_STATE_HOME="$deb_smoke_root/state"');
-    expect(debGui).toContain('xvfb-run -a /usr/bin/chat-on-steroids');
+    expect(debGui).toContain('xvfb-run -a /usr/bin/dvs-chatgpt-workflow');
     expect(debGui).toContain('--kill-after=5s 12s');
     expect(debGui).toContain("grep -Fq '[info] app started' deb-gui.log");
     expect(debGui).toContain("grep -Fq '[info] window loaded' deb-gui.log");
@@ -332,12 +332,12 @@ describe('cross-platform packaging targets', () => {
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     const iconScript = readFileSync(path.join(root, 'scripts', 'make-icon.mjs'), 'utf8');
     expect(builder.toolsets.appimage).toBe('1.0.3');
-    expect(builder.linux.artifactName).toBe('Chat-On-Steroids-Linux-${env.COS_PACKAGE_ARCH}.${ext}');
+    expect(builder.linux.artifactName).toBe('DVS-ChatGPT-Workflow-Linux-${env.COS_PACKAGE_ARCH}.${ext}');
     expect(builder.deb.depends).toContain('libgtk-3-0 | libgtk-3-0t64');
     expect(builder.deb.depends).toContain('libatspi2.0-0 | libatspi2.0-0t64');
     expect(builder.linux.syncDesktopName).toBe(true);
-    expect(builder.linux.maintainer).toMatch(/^Chat On Steroids <[^>]+@users\.noreply\.github\.com>$/);
-    expect(pkg.desktopName).toBe('com.chatonsteroids.app.desktop');
+    expect(builder.linux.maintainer).toMatch(/^DVS ChatGPT Workflow <[^>]+@users\.noreply\.github\.com>$/);
+    expect(pkg.desktopName).toBe('com.digitalvisionstudios.dvs-chatgpt-workflow.desktop');
     expect(pkg.homepage).toBe('https://github.com/DigitalVisionStudios/dvs-chatgpt-workflow');
     expect(iconScript).toContain("build', 'icon.png'), pngFor(1024)");
 
@@ -350,14 +350,14 @@ describe('cross-platform packaging targets', () => {
     expect(releaseWorkflow).toContain('run_appimage_smoke normal "$normal_smoke_root" "$PATH" appimage-normal-gui.log');
     expect(releaseWorkflow).toContain('run_appimage_smoke forced-fallback "$fallback_smoke_root" "$fake_bin:$PATH" appimage-fallback-gui.log');
     expect(releaseWorkflow).toContain('CLF_DEBUG=1 timeout --signal=TERM --kill-after=5s 12s xvfb-run -a "$appimage" >"$log"');
-    expect(releaseWorkflow).toContain('CLF_DEBUG=1 timeout --signal=TERM --kill-after=5s 12s xvfb-run -a /usr/bin/chat-on-steroids');
+    expect(releaseWorkflow).toContain('CLF_DEBUG=1 timeout --signal=TERM --kill-after=5s 12s xvfb-run -a /usr/bin/dvs-chatgpt-workflow');
     expect(releaseWorkflow).toContain("grep -Fq '[info] app started' \"$log\"");
     expect(releaseWorkflow).toContain("grep -Fq '[info] window loaded' \"$log\"");
-    expect(releaseWorkflow).toContain("test \"$(dpkg-deb --field \"$deb\" Package)\" = chat-on-steroids");
+    expect(releaseWorkflow).toContain("test \"$(dpkg-deb --field \"$deb\" Package)\" = dvs-chatgpt-workflow");
     expect(releaseWorkflow).toContain("test \"$(dpkg-deb --field \"$deb\" Version)\" = \"$(node -p \"require('./package.json').version\")\"");
     expect(releaseWorkflow).toContain('expected_deb_arch=amd64');
-    expect(releaseWorkflow).toContain('test -L /usr/bin/chat-on-steroids');
-    expect(releaseWorkflow).toContain('installed_executable="$(readlink -f /usr/bin/chat-on-steroids)"');
+    expect(releaseWorkflow).toContain('test -L /usr/bin/dvs-chatgpt-workflow');
+    expect(releaseWorkflow).toContain('installed_executable="$(readlink -f /usr/bin/dvs-chatgpt-workflow)"');
     expect(releaseWorkflow).toContain('test -x "$installed_executable"');
     expect(releaseWorkflow).toContain('dpkg-query -S "$installed_executable"');
     expect(releaseWorkflow).toContain("node scripts/smoke-packaged-runtime.mjs --platform linux --arch '${{ matrix.arch }}' --root \"$(dirname \"$installed_executable\")\"");
@@ -402,14 +402,14 @@ describe('cross-platform packaging targets', () => {
     expect(builder.mac.notarize).toBe(false);
     expect(builder.mac.category).toBe('public.app-category.developer-tools');
     expect(builder.mac.minimumSystemVersion).toBe('13.0');
-    expect(builder.mac.artifactName).toBe('Chat-On-Steroids-macOS-${arch}.${ext}');
+    expect(builder.mac.artifactName).toBe('DVS-ChatGPT-Workflow-macOS-${arch}.${ext}');
     const nativePrep = readFileSync(path.join(root, 'scripts', 'prepare-packaging-native.mjs'), 'utf8');
     expect(nativePrep).toContain("await chmod(path.join(payloadRoot, 'node-pty', 'prebuilds', prebuildDir, 'spawn-helper'), 0o755)");
     for (const marker of [
-      "CFBundleIdentifier: 'com.chatonsteroids.app'",
-      "CFBundleExecutable: 'Chat On Steroids'",
-      "CFBundleName: 'Chat On Steroids'",
-      "CFBundleDisplayName: 'Chat On Steroids'",
+      "CFBundleIdentifier: 'com.digitalvisionstudios.dvs-chatgpt-workflow'",
+      "CFBundleExecutable: 'DVS ChatGPT Workflow'",
+      "CFBundleName: 'DVS ChatGPT Workflow'",
+      "CFBundleDisplayName: 'DVS ChatGPT Workflow'",
       "CFBundleIconFile: 'icon.icns'",
       'CFBundleShortVersionString: packageVersion',
       'CFBundleVersion: packageVersion',
@@ -452,7 +452,7 @@ describe('cross-platform packaging targets', () => {
   });
 
   it('hides Electron helper parentheses from otool-classic without changing the inspected file', () => {
-    const file = '/Applications/Chat On Steroids.app/Contents/Frameworks/Chat On Steroids Helper (GPU).app/Contents/MacOS/Chat On Steroids Helper (GPU)';
+    const file = '/Applications/DVS ChatGPT Workflow.app/Contents/Frameworks/DVS ChatGPT Workflow Helper (GPU).app/Contents/MacOS/DVS ChatGPT Workflow Helper (GPU)';
     const calls: Array<{ kind: string; args: unknown[] }> = [];
     const result = withOtoolSafePath(
       file,
@@ -585,7 +585,7 @@ Load command 11
     expect(workflow.slice(candidate, publish)).toContain('needs: preflight');
     expect(workflow.slice(publish)).toContain('node scripts/check-release-absent.mjs');
     expect(workflow.slice(publish).match(/npm run verify:tunnel-current/g)).toHaveLength(1);
-    expect(workflow).toContain('name: chat-on-steroids-candidate-${{ github.run_id }}');
+    expect(workflow).toContain('name: dvs-chatgpt-workflow-candidate-${{ github.run_id }}');
   });
 
   it('keeps the current changelog and reviewed release notes aligned with every published artifact', () => {
@@ -609,17 +609,17 @@ Load command 11
     expect(notes).toMatch(/unnotarized/i);
 
     const artifacts = [
-      'Chat-On-Steroids-Setup-x64.exe',
-      'Chat-On-Steroids-Setup-arm64.exe',
-      'Chat-On-Steroids-macOS-x64.dmg',
-      'Chat-On-Steroids-macOS-x64.zip',
-      'Chat-On-Steroids-macOS-arm64.dmg',
-      'Chat-On-Steroids-macOS-arm64.zip',
-      'Chat-On-Steroids-Linux-x64.AppImage',
-      'Chat-On-Steroids-Linux-x64.deb',
-      'Chat-On-Steroids-Linux-arm64.AppImage',
-      'Chat-On-Steroids-Linux-arm64.deb',
-      'Chat-On-Steroids-Extension.zip',
+      'DVS-ChatGPT-Workflow-Setup-x64.exe',
+      'DVS-ChatGPT-Workflow-Setup-arm64.exe',
+      'DVS-ChatGPT-Workflow-macOS-x64.dmg',
+      'DVS-ChatGPT-Workflow-macOS-x64.zip',
+      'DVS-ChatGPT-Workflow-macOS-arm64.dmg',
+      'DVS-ChatGPT-Workflow-macOS-arm64.zip',
+      'DVS-ChatGPT-Workflow-Linux-x64.AppImage',
+      'DVS-ChatGPT-Workflow-Linux-x64.deb',
+      'DVS-ChatGPT-Workflow-Linux-arm64.AppImage',
+      'DVS-ChatGPT-Workflow-Linux-arm64.deb',
+      'DVS-ChatGPT-Workflow-Extension.zip',
       'SHA256SUMS.txt'
     ];
     const checksumStep = release.slice(
