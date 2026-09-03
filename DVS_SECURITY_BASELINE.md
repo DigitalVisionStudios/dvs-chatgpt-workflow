@@ -31,6 +31,10 @@ Powerful permissions will be enabled later through explicit DVS workflow modes s
 
 The upstream Goal/Loop OpenRouter integration already defaults to disabled. Keep it disabled by default. DVS loop/queue work must not silently opt users into sending conversation content to third-party model providers.
 
+### Browser pairing
+
+The DVS fork replaces upstream silent token minting with a trusted-app approval gate. The extension may request access over loopback, but the Electron UI must approve a pending request before one token can be minted. Approval expires after one minute, is consumed by the next successful mint and does not survive an app restart.
+
 ### Session history
 
 Upstream session recording is detailed and stored locally without safeStorage encryption. DVS keeps recording enabled during the initial port because continuation and recovery depend on it, but encrypted-at-rest session storage remains a hardening target before treating the fork as suitable for highly sensitive client conversations.
