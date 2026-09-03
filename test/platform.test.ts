@@ -9,7 +9,7 @@ import {
 import { surfaceIsUseful } from '../src/main/mcp/surfaces.js';
 import { serverInstructions } from '../src/main/mcp/instructions.js';
 import { unifiedExecEnvForPlatform } from '../src/main/codex/unified-exec-constants.js';
-import { CAPABILITIES, type Capabilities } from '../src/shared/types.js';
+import { CAPABILITIES, DESKTOP_CAPABILITIES, type Capabilities } from '../src/shared/types.js';
 
 const allCapabilities = (): Capabilities => ({
   browse: true,
@@ -28,11 +28,11 @@ const allCapabilities = (): Capabilities => ({
 });
 
 describe('cross-platform product surface', () => {
-  it('starts macOS on the DVS read baseline and keeps a Desktop the user switched on', () => {
+  it('starts macOS with Core on and Desktop off, and keeps a Desktop the user switched on', () => {
     const config = defaultConfig('darwin', '21.4.0');
-    const baseline = new Set(['browse', 'search', 'read', 'metadata']);
+    for (const capability of DESKTOP_CAPABILITIES) expect(config.capabilities[capability], capability).toBe(false);
     for (const capability of CAPABILITIES) {
-      expect(config.capabilities[capability], capability).toBe(baseline.has(capability));
+      if (!DESKTOP_CAPABILITIES.includes(capability)) expect(config.capabilities[capability], capability).toBe(true);
     }
     expect(surfaceIsUseful('core', config.capabilities, 'darwin')).toBe(true);
     expect(surfaceIsUseful('desktop', config.capabilities, 'darwin', '21.4.0')).toBe(false);
@@ -42,18 +42,18 @@ describe('cross-platform product surface', () => {
     expect(surfaceIsUseful('desktop', switchedOn.capabilities, 'darwin', '21.4.0')).toBe(true);
   });
 
-  it('keeps the DVS read baseline usable while omitting Desktop on Linux', () => {
+  it('keeps Core fully usable while omitting Desktop on Linux', () => {
     const config = defaultConfig('linux');
     expect(config.capabilities).toMatchObject({
       browse: true,
       search: true,
       read: true,
       metadata: true,
-      create: false,
-      edit: false,
-      move: false,
-      deleteFile: false,
-      command: false,
+      create: true,
+      edit: true,
+      move: true,
+      deleteFile: true,
+      command: true,
       screen: false,
       control: false,
       clipboardRead: false,

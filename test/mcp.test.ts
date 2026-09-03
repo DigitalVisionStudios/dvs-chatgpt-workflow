@@ -1359,25 +1359,14 @@ describe('capability gating', () => {
     expect(failed(oldLimit)).toBe(true);
   });
 
-  it('starts a fresh DVS install with only the read baseline effective', () => {
+  it('starts a fresh install with every capability effective', () => {
+    // This assertion is about the product's fully-enabled fresh-install policy, not the
+    // host running Vitest. Windows has no OS-version floor, so it is the deterministic
+    // representative for a host with every declared capability.
     const config = defaultConfig('win32');
     expect(config.readOnly).toBe(false);
-    expect(config.multiAgent.enabled).toBe(false);
-    expect(effectiveCapabilities(config, 'win32')).toMatchObject({
-      browse: true,
-      search: true,
-      read: true,
-      metadata: true,
-      create: false,
-      edit: false,
-      move: false,
-      deleteFile: false,
-      command: false,
-      screen: false,
-      control: false,
-      clipboardRead: false,
-      clipboardWrite: false
-    });
+    expect(config.multiAgent.enabled).toBe(true);
+    expect(Object.values(effectiveCapabilities(config, 'win32')).every(Boolean)).toBe(true);
   });
 
   it('refuses to call a tool that is not registered', async () => {

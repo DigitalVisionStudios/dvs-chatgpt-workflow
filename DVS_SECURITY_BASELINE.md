@@ -1,4 +1,4 @@
-# DVS ChatGPT Workflow security baseline
+# DVS ChatGPT Workflow baseline
 
 ## Fork origin
 
@@ -7,60 +7,63 @@
 - Fork: `DigitalVisionStudios/dvs-chatgpt-workflow`
 - Baseline date: 2026-09-03
 
-## Trust policy
+## What this baseline is for
 
-The DVS fork is built from reviewed source. Upstream prebuilt installers are not part of the trusted update path.
+The security goal is practical: verify the source is clean enough to use as the DVS foundation and avoid an upstream binary/update path we do not control. DVS is not intended to add permission prompts or security friction to normal building and automation.
 
-### Automatic updates
+The source review found no RAT/trojan indicators in the audited upstream baseline.
 
-Automatic update scheduling is disabled in the DVS fork. The updater engine remains available for explicit/manual use and regression tests, but its release API, checksum manifest, installers, and extension recovery URLs all target only `DigitalVisionStudios/dvs-chatgpt-workflow`, never the upstream maintainer repository.
+## Trust and supply chain
 
-### Fresh-install permissions
+### Builds and updates
 
-Fresh installs start fail-closed:
+Build DVS from this reviewed fork rather than installing upstream prebuilt executables.
 
-- enabled: browse, search, read, metadata
-- disabled: create, edit, move, deleteFile, command
-- disabled: desktop control and clipboard mutation/read permissions
-- disabled: multi-agent execution
-- disabled: unattributed-call bypasses
+Automatic update scheduling remains disabled. Release/checksum/extension recovery references point to `DigitalVisionStudios/dvs-chatgpt-workflow`, so a DVS installation does not silently ingest a future upstream maintainer binary.
 
-Powerful permissions will be enabled later through explicit DVS workflow modes such as Ultra Max.
+### Dependencies
 
-### External model loop
+The 2026-09-03 lockfile audit found two vulnerable transitive build dependencies under `electron-builder`:
 
-The upstream Goal/Loop OpenRouter integration already defaults to disabled. Keep it disabled by default. DVS loop/queue work must not silently opt users into sending conversation content to third-party model providers.
+- `fast-uri 3.1.5` via `app-builder-lib -> ajv`
+- `@xmldom/xmldom 0.8.14` via `app-builder-lib -> plist`
+
+The DVS fork pins fixed compatible versions and CI audits the lockfile before dependency install scripts run.
+
+## Usability defaults
+
+DVS keeps the upstream power-user behavior for normal building:
+
+- fresh-install capabilities are enabled rather than read-only
+- multi-agent execution may start enabled on a fresh install
+- unattributed-call fallback may start enabled on a fresh install
+- command/file/browser workflows do not require a separate DVS Safe-mode approval step
+
+Existing saved user choices and corruption/fail-closed migration behavior are still respected by the upstream config system.
 
 ### Browser pairing
 
-The DVS fork replaces upstream silent token minting with a trusted-app approval gate. The extension may request access over loopback, but the Electron UI must approve a pending request before one token can be minted. Approval expires after one minute, is consumed by the next successful mint and does not survive an app restart.
+Use the upstream low-friction localhost pairing design. There is no DVS "Approve browser" button or explicit first-pair approval.
+
+The companion bridge remains loopback-only, requires a Chrome-extension origin, and uses a bearer token for protected routes. As upstream documents, another process already running as the same OS user can potentially obtain that browser token; this is accepted for our local development use case because the bridge does not expose filesystem, command, or permission-changing routes.
 
 ### Session history
 
-Upstream session recording is detailed and stored locally without safeStorage encryption. DVS keeps recording enabled during the initial port because continuation and recovery depend on it, but encrypted-at-rest session storage remains a hardening target before treating the fork as suitable for highly sensitive client conversations.
+Keep upstream durable session recording behavior. Session history is local plaintext and is **not** being redesigned for encrypted-at-rest storage at this stage. Continuation/recovery reliability is more important for this project, and encryption can be reconsidered later only if the use case requires it.
 
 ### Command execution
 
-`exec_command` intentionally runs with the privileges of the logged-in OS user and is not confined to approved roots after launch. DVS must only expose it through an explicit high-capability mode.
+`exec_command` intentionally runs with the logged-in OS user's privileges and is not confined to approved project roots after launch. This is expected functionality for DVS/Ultra Max rather than something to gate behind an extra approval layer.
 
-## Dependency audit
+### Goal / Loop provider
 
-The 2026-09-03 npm advisory check found two vulnerable transitive build-time dependencies under `electron-builder`:
+The upstream OpenRouter Goal/Loop integration remains opt-in because it requires a provider key. Porting DVS queues, loops and Ultra Max should not require OpenRouter unless we deliberately choose to use it.
 
-- `fast-uri 3.1.5` via `app-builder-lib -> ajv`: high severity, fixed in 3.1.6
-- `@xmldom/xmldom 0.8.14` via `app-builder-lib -> plist`: moderate severity, fixed in 0.8.15
+## Remaining pre-install checks
 
-The DVS fork pins fixed compatible versions with npm overrides. The lockfile must be regenerated without running install scripts and `npm audit --package-lock-only` must be clean before the first DVS package is built.
-
-## Remaining pre-run gates
-
-1. Regenerate and audit the lockfile.
-2. Review browser bridge pairing/origin enforcement.
-3. Review all outbound network destinations.
-4. Review command/process spawning and tunnel launch paths.
-5. Review extension permissions and content-script data flow.
-6. Review session persistence and retention.
-7. Run typecheck and the full upstream test suite.
-8. Build locally from the DVS fork only.
-9. Compare packaged file inventory against source/build configuration.
-10. Only then install the DVS build.
+1. Keep the dependency audit clean.
+2. Keep the full upstream verification suite green after DVS changes.
+3. Build the first package from the DVS fork only.
+4. Compare packaged contents/update endpoints against the reviewed source.
+5. Install and live-test the DVS build.
+6. Then port/finish DVS Queue, Auto Queue, Loop, Ultra Max and durable rollover behavior.

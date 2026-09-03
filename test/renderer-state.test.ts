@@ -57,7 +57,7 @@ it('does not overwrite a focused dirty settings field on an unsolicited state pu
     hasGoalKey: false,
     resolvedBinary: null,
     bundledTunnelVersion: null,
-    bridge: { running: true, port: 8765, paired: false, present: false, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: null, extensionVersion: null },
+    bridge: { running: true, port: 8765, paired: false, present: false, lastSeenAt: null, extensionVersion: null },
     update: { current: '2.0.2', latest: null, stage: 'idle', error: null, checkedAt: null }
   };
   const ok = (data: any) => Promise.resolve({ ok: true, data });
@@ -212,7 +212,7 @@ it('serializes settings intent so rapid toggles and later UI changes cannot undo
     hasGoalKey: false,
     resolvedBinary: null,
     bundledTunnelVersion: null,
-    bridge: { running: true, port: 8765, paired: false, present: false, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: null, extensionVersion: null },
+    bridge: { running: true, port: 8765, paired: false, present: false, lastSeenAt: null, extensionVersion: null },
     update: { current: '2.0.2', latest: null, stage: 'idle', error: null, checkedAt: null }
   });
   let current = appState(baseConfig);
@@ -359,7 +359,7 @@ async function mountChat(
     hasGoalKey: false,
     resolvedBinary: null,
     bundledTunnelVersion: null,
-    bridge: { running: true, port: 8765, paired: false, present: false, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: null, extensionVersion: null },
+    bridge: { running: true, port: 8765, paired: false, present: false, lastSeenAt: null, extensionVersion: null },
     update: { current: '2.0.2', latest: null, stage: 'idle', error: null, checkedAt: null },
     ...overrides
   };
@@ -604,7 +604,7 @@ it('requires a live browser only when a browser-backed feature is actually enabl
     },
     // The token survived, but this process has not heard from the extension. This is the
     // disabled/uninstalled-extension-after-app-restart repro.
-    bridge: { running: true, port: 8765, paired: true, present: false, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: null, extensionVersion: null },
+    bridge: { running: true, port: 8765, paired: true, present: false, lastSeenAt: null, extensionVersion: null },
     update: { current: '2.0.2', latest: null, stage: 'idle', error: null, checkedAt: null }
   });
   const doc = mounted.window.document;
@@ -619,7 +619,7 @@ it('requires a live browser only when a browser-backed feature is actually enabl
   const live = structuredClone(mounted.state) as any;
   live.hasApiKey = true;
   live.status = (mounted.state as any).status;
-  live.bridge = { running: true, port: 8765, paired: true, present: true, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: Date.now() };
+  live.bridge = { running: true, port: 8765, paired: true, present: true, lastSeenAt: Date.now() };
   mounted.push(live);
   expect(browserStep.classList.contains('is-done')).toBe(true);
   expect(doc.getElementById('bridgeState')!.textContent).toContain('Connected.');
@@ -631,38 +631,13 @@ it('requires a live browser only when a browser-backed feature is actually enabl
   browserFree.config.sessions.record = false;
   browserFree.config.multiAgent.enabled = false;
   browserFree.config.goal.enabled = true;
-  browserFree.bridge = { running: false, port: null, paired: true, present: false, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: Date.now() };
+  browserFree.bridge = { running: false, port: null, paired: true, present: false, lastSeenAt: Date.now() };
   mounted.push(browserFree);
   expect(browserStep.hidden).toBe(true);
   expect(doc.getElementById('wizard')!.classList.contains('is-tidy')).toBe(true);
   expect(doc.getElementById('bridgeState')!.textContent).toContain('not needed');
   expect((doc.getElementById('goalEnabled') as HTMLInputElement).disabled).toBe(true);
   expect(doc.getElementById('goalHint')!.textContent).toMatch(/recording first/i);
-});
-
-
-it('surfaces a pending browser pairing request for trusted-app approval', async () => {
-  const mounted = await mountChat({
-    bridge: {
-      running: true,
-      port: 8765,
-      paired: false,
-      present: false,
-      pairingRequestedAt: Date.now(),
-      pairingApprovalExpiresAt: null,
-      lastSeenAt: null,
-      extensionVersion: '2.0.2'
-    }
-  });
-  const doc = mounted.window.document;
-  expect(doc.getElementById('bridgeState')!.textContent).toContain('waiting for approval');
-  expect((doc.getElementById('bridgeApprove') as HTMLButtonElement).disabled).toBe(false);
-
-  const approved = structuredClone(mounted.state) as any;
-  approved.bridge.pairingApprovalExpiresAt = Date.now() + 60_000;
-  mounted.push(approved);
-  expect(doc.getElementById('bridgeState')!.textContent).toContain('Browser approved');
-  expect((doc.getElementById('bridgeApprove') as HTMLButtonElement).disabled).toBe(true);
 });
 
 /**
@@ -674,7 +649,7 @@ it('surfaces a pending browser pairing request for trusted-app approval', async 
  */
 it('says nothing about being current until the check has actually answered', async () => {
   const mounted = await mountChat({
-    bridge: { running: true, port: 8765, paired: true, present: true, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: Date.now(), extensionVersion: '2.0.2' }
+    bridge: { running: true, port: 8765, paired: true, present: true, lastSeenAt: Date.now(), extensionVersion: '2.0.2' }
   });
   const doc = mounted.window.document;
   const line = doc.getElementById('updateLine')!;
@@ -736,7 +711,7 @@ it('reports a staged update in the Activity line and the header bar', async () =
 it('asks for an extension reload only when the extension is older than this app', async () => {
   const mounted = await mountChat({
     bridge: {
-      running: true, port: 8765, paired: true, present: true, pairingRequestedAt: null, pairingApprovalExpiresAt: null, lastSeenAt: Date.now(), extensionVersion: '2.0.1'
+      running: true, port: 8765, paired: true, present: true, lastSeenAt: Date.now(), extensionVersion: '2.0.1'
     }
   });
   const doc = mounted.window.document;

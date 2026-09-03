@@ -148,27 +148,22 @@ const DEFAULT_MULTI_AGENT: MultiAgentSettings = {
   // a plain chat that once called a tool — is the user's choice to make.
   recoverAgentTabs: false
 };
-/**
- * DVS fresh-install exposure.
- *
- * Start with observation/read capabilities only. Write, command, desktop-control and clipboard
- * mutation permissions are enabled later by an explicit DVS mode such as Ultra Max rather than
- * being granted just because the app was installed. This keeps a new fork install fail-closed
- * while we finish porting the DVS workflow controller.
- */
-const SAFE_FIRST_LAUNCH_CAPABILITIES = new Set(['browse', 'search', 'read', 'metadata']);
+/** Fresh-install exposure. Kept separate from migration defaults on purpose. */
 const ALL_FIRST_LAUNCH_CAPABILITIES: Capabilities = Object.fromEntries(
-  CAPABILITIES.map((capability) => [capability, SAFE_FIRST_LAUNCH_CAPABILITIES.has(capability)])
+  CAPABILITIES.map((capability) => [capability, true])
 ) as Capabilities;
-
-/**
- * DVS also starts multi-agent execution and unattributed-call bypasses disabled. Both can be
- * enabled deliberately after the companion extension has proven caller identity.
- */
+// Unattributed calls start permitted on a fresh install for the same reason recording does:
+// the ambiguity fences refuse work when the extension cannot *prove* the caller, and a new
+// install is exactly where that evidence path is least likely to be healthy yet. Off, the
+// first thing a user sees is CALLER_IDENTITY_REQUIRED; on, the work runs and its activity is
+// still labelled Unattributed rather than guessed onto a chat. This relaxes only the fences —
+// a positively known dormant/retired/ended worker is refused either way. `DEFAULT_MULTI_AGENT`
+// keeps `false` so an upgrade never relaxes an older config merely because the field was
+// absent when that config was written.
 const FIRST_LAUNCH_MULTI_AGENT: MultiAgentSettings = {
   ...DEFAULT_MULTI_AGENT,
-  enabled: false,
-  allowUnattributedCalls: false
+  enabled: true,
+  allowUnattributedCalls: true
 };
 
 const rootSchema = z.object({
@@ -369,10 +364,11 @@ const configSchema = z.object({
 });
 
 /**
- * DVS fresh installs expose only the observation/read baseline on every host. Platform masking
- * still removes capabilities a host cannot implement, while command, filesystem mutation,
- * desktop control and clipboard access remain off until an explicit DVS capability mode enables
- * them. This keeps installation itself from being permission consent.
+ * Fresh-install Desktop exposure differs by host. Windows starts the Desktop group on. macOS has
+ * a native backend too, but it starts **off** and is switched on by the user: every Desktop
+ * action there also needs Screen Recording / Accessibility consent from System Settings, and a
+ * fresh install must not publish a second connector nobody can use yet. Unsupported hosts mask
+ * the group at the platform boundary while preserving stored choices for a moved config.
  */
 function firstLaunchCapabilities(platform: NodeJS.Platform, release?: string): Capabilities {
   const capabilities = capabilitiesForPlatform({ ...ALL_FIRST_LAUNCH_CAPABILITIES }, platform, release);
@@ -397,8 +393,8 @@ export function defaultConfig(platform: NodeJS.Platform = process.platform, rele
 /**
  * Recovery for a config file that exists but cannot be trusted.
  *
- * A missing file is a real first launch and gets the DVS read-only-capability baseline above.
- * A malformed/corrupt existing file is different: treating damage as consent would
+ * A missing file is a real first launch and intentionally gets the fully-enabled defaults
+ * above. A malformed/corrupt existing file is different: treating damage as consent would
  * widen filesystem/desktop/process access merely because parsing failed. Keep that path on
  * the historical narrow capability set and read-only mode until the user saves settings again.
  */

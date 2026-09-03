@@ -1942,33 +1942,23 @@ export function chatApply(state: AppState, previous?: Config): void {
 
   applyGoal(state, previous);
 
-  // Extension bridge. DVS requires one trusted-app approval before the extension receives a token.
+  // Extension bridge. Connecting is automatic, so this reports rather than asks.
   const browserRequired = browserExtensionRequired(config);
-  const secureStorageAvailable = state.secureStorage?.available ?? true;
-  const pairingPending = bridge.pairingRequestedAt !== null && !bridge.paired;
-  const pairingApproved =
-    bridge.pairingApprovalExpiresAt !== null && bridge.pairingApprovalExpiresAt > Date.now() && !bridge.paired;
-  const approveButton = $<HTMLButtonElement>('bridgeApprove');
-  approveButton.hidden = !pairingPending;
-  approveButton.disabled = !bridge.running || !secureStorageAvailable || pairingApproved;
   $<HTMLButtonElement>('bridgeUnpair').disabled = !bridge.paired;
+  const secureStorageAvailable = state.secureStorage?.available ?? true;
   $('bridgeState').textContent = !browserRequired
     ? 'Browser-backed features are off. The extension is not needed right now.'
     : !secureStorageAvailable
       ? (state.secureStorage?.detail ?? 'Secure credential storage is unavailable, so the extension cannot pair safely.')
     : !bridge.running
       ? 'The local bridge is off even though recording or multi-agent mode needs it.'
-    : bridge.present
-      ? `Connected. Listening on 127.0.0.1:${bridge.port ?? '?'} · last message ${ago(bridge.lastSeenAt)}.`
-    : bridge.paired
-      ? `Authorized, but the browser extension is not currently connected. ${
-          bridge.lastSeenAt === null ? 'It has not checked in since this app started.' : `Last seen ${ago(bridge.lastSeenAt)}.`
-        }`
-    : pairingApproved
-      ? 'Browser approved. Waiting for the extension to retry its pairing request.'
-    : pairingPending
-      ? 'Browser pairing request waiting for approval.'
-      : `Listening on 127.0.0.1:${bridge.port ?? '?'} · no browser is authorized or connected yet.`;
+      : bridge.present
+        ? `Connected. Listening on 127.0.0.1:${bridge.port ?? '?'} · last message ${ago(bridge.lastSeenAt)}.`
+        : bridge.paired
+          ? `Authorized, but the browser extension is not currently connected. ${
+              bridge.lastSeenAt === null ? 'It has not checked in since this app started.' : `Last seen ${ago(bridge.lastSeenAt)}.`
+            }`
+          : `Listening on 127.0.0.1:${bridge.port ?? '?'} · no browser is authorized or connected yet.`;
   $('bridgeState').classList.toggle('is-warn', browserRequired && (!bridge.present || !secureStorageAvailable));
   void showExtensionPath();
 
@@ -2102,10 +2092,6 @@ export function initChat(next: Deps): void {
 
   wireGoal(() => deps.save());
 
-  $('bridgeApprove').addEventListener('click', async () => {
-    const state = await run(api.approveExtensionPairing());
-    if (state) toast('Browser pairing approved');
-  });
   $('bridgeUnpair').addEventListener('click', async () => {
     const state = await run(api.unpairExtension());
     if (state) toast('Browser disconnected');

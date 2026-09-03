@@ -100,7 +100,6 @@ const api = {
   deleteSession: (id: string) => call<boolean>('sessions:delete', { id }),
   getHandoff: (id: string, handoffId?: string) => call<Handoff | null>('handoff:get', { id, handoffId }),
 
-  approveExtensionPairing: () => call<AppState>('bridge:approvePairing'),
   unpairExtension: () => call<AppState>('bridge:unpair'),
   downloadExtension: () => call<boolean>('bridge:downloadExtension'),
   // The renderer can ask where the extension is and ask for it to be opened, but the

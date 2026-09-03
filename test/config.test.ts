@@ -9,7 +9,7 @@ import {
   saveConfig,
   updateConfig
 } from '../src/main/config.js';
-import { type Capability } from '../src/shared/types.js';
+import { DESKTOP_CAPABILITIES, type Capability } from '../src/shared/types.js';
 import { makeTempDir, removeTempDir } from './helpers.js';
 
 let dir: string;
@@ -305,37 +305,38 @@ describe('settings migration', () => {
 
 /** Fresh-install defaults, while migrations above prove existing choices stay narrow. */
 describe('shipped defaults', () => {
-  const DVS_FRESH_CAPABILITIES = new Set<Capability>(['browse', 'search', 'read', 'metadata']);
-  const expectedFreshCapability = (capability: Capability, _platform: NodeJS.Platform): boolean =>
-    DVS_FRESH_CAPABILITIES.has(capability);
+  // Windows alone starts the Desktop group on. macOS has the backend but starts it off; the
+  // user switches it on and grants Screen Recording / Accessibility. Linux has no backend.
+  const expectedFreshCapability = (capability: Capability, platform: NodeJS.Platform): boolean =>
+    platform === 'win32' || !DESKTOP_CAPABILITIES.includes(capability);
 
   it('records sessions from first launch', () => {
     expect(defaultConfig().sessions.record).toBe(true);
   });
 
-  it('loads a genuinely missing config with only the DVS read baseline enabled', async () => {
+  it('loads a genuinely missing config with every portable Core capability enabled', async () => {
     await fs.rm(path.join(dir, 'config.json'), { force: true });
     const loaded = await loadConfig();
     expect(loaded.readOnly).toBe(false);
     for (const [capability, enabled] of Object.entries(loaded.capabilities) as Array<[Capability, boolean]>) {
       expect(enabled, capability).toBe(expectedFreshCapability(capability, process.platform));
     }
-    expect(loaded.multiAgent.enabled).toBe(false);
-    expect(loaded.multiAgent.allowUnattributedCalls).toBe(false);
+    expect(loaded.multiAgent.enabled).toBe(true);
+    expect(loaded.multiAgent.allowUnattributedCalls).toBe(true);
     expect(loaded.multiAgent.recoverAgentTabs).toBe(false);
   });
 
   it.each(['win32', 'darwin', 'linux'] as const)(
-    'starts only DVS read-baseline permissions on %s',
+    'starts portable permissions on and Desktop automation on Windows only on %s',
     (platform) => {
       const config = defaultConfig(platform);
       expect(config.readOnly).toBe(false);
       for (const [capability, enabled] of Object.entries(config.capabilities) as Array<[Capability, boolean]>) {
         expect(enabled, `${platform}:${capability}`).toBe(expectedFreshCapability(capability, platform));
       }
-      expect(config.multiAgent.enabled).toBe(false);
+      expect(config.multiAgent.enabled).toBe(true);
       expect(config.multiAgent.maxWorkers).toBe(2);
-      expect(config.multiAgent.allowUnattributedCalls).toBe(false);
+      expect(config.multiAgent.allowUnattributedCalls).toBe(true);
       expect(config.multiAgent.recoverAgentTabs).toBe(false);
     }
   );
@@ -368,8 +369,9 @@ describe('shipped defaults', () => {
   });
 
   /**
-   * Recording remains on for a fresh DVS install because continuation/recovery depends on it.
-   * An explicit existing choice to turn it off must still survive a later load.
+   * The default moved after this app had already shipped with recording off. Turning it on
+   * underneath somebody who switched it off would be changing a privacy setting on their
+   * behalf, so the new default is for configs that do not have the key at all.
    */
   it('leaves an existing choice to record alone', async () => {
     const config = defaultConfig();
@@ -385,12 +387,13 @@ describe('shipped defaults', () => {
   });
 
   /**
-   * Save, close, reopen. DVS defaults unattributed calls off, but either explicit user choice
-   * must survive the next launch rather than being replaced by the fresh-install default.
+   * Save, close, reopen. The unattributed switch is on out of the box, so the only way to
+   * see it off is to have turned it off — and that choice has to survive the next launch
+   * rather than being handed back the fresh-install default on load.
    */
   it('keeps either unattributed choice across a save and reload', async () => {
     const config = defaultConfig();
-    expect(config.multiAgent.allowUnattributedCalls).toBe(false);
+    expect(config.multiAgent.allowUnattributedCalls).toBe(true);
 
     await saveConfig({
       ...config,

@@ -496,18 +496,6 @@ const listeners = new Set<() => void>();
 let extensionVersion: string | null = null;
 let versionWarned = false;
 
-/**
- * DVS pairing approval is process-local and short-lived.
- *
- * A browser may ask to pair, but token minting does not happen until the trusted Electron UI
- * approves that pending request. Approval is consumed by the next successful mint and never
- * survives an app restart.
- */
-const PAIRING_REQUEST_MS = 5 * 60_000;
-const PAIRING_APPROVAL_MS = 60_000;
-let pairingRequestedAt: number | null = null;
-let pairingApprovalExpiresAt: number | null = null;
-
 export function onBridgeChange(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -519,16 +507,11 @@ function changed(): void {
 
 export async function bridgeStatus(): Promise<BridgeStatus> {
   const stored = await getSecret('bridgeToken');
-  const now = Date.now();
-  if (pairingRequestedAt !== null && now - pairingRequestedAt > PAIRING_REQUEST_MS) pairingRequestedAt = null;
-  if (pairingApprovalExpiresAt !== null && pairingApprovalExpiresAt <= now) pairingApprovalExpiresAt = null;
   return {
     running: server !== null,
     port,
     paired: stored !== null && stored !== BROWSER_DISCONNECTED,
     present: browserPresent(),
-    pairingRequestedAt,
-    pairingApprovalExpiresAt,
     lastSeenAt,
     extensionVersion
   };
@@ -569,23 +552,11 @@ function noteBrowserSeen(): boolean {
  * The only remaining manual step in the extension's lifecycle, and it is a revocation
  * rather than a setup: there is nothing to press to connect.
  */
-export function approvePairing(): void {
-  const now = Date.now();
-  if (pairingRequestedAt === null || now - pairingRequestedAt > PAIRING_REQUEST_MS) {
-    pairingRequestedAt = null;
-    pairingApprovalExpiresAt = null;
-    throw new Error('No browser pairing request is waiting for approval.');
-  }
-  pairingApprovalExpiresAt = now + PAIRING_APPROVAL_MS;
-  logInfo('bridge: browser pairing approved in the app');
-  changed();
-}
-
 export async function unpair(): Promise<void> {
   // Clearing the credential is ambiguous: it is also what a fresh install or repaired
-  // secrets store looks like. The disconnected sentinel preserves explicit revocation.
-  pairingRequestedAt = null;
-  pairingApprovalExpiresAt = null;
+  // secrets store looks like, and those are intentionally allowed to provision silently.
+  // This impossible-as-a-token sentinel preserves the user's explicit intent across both
+  // the extension's next poll and an app restart.
   await setSecret('bridgeToken', BROWSER_DISCONNECTED);
   logInfo('bridge: browser disconnected');
   changed();
@@ -1115,27 +1086,19 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
         origin
       );
     }
-
-    const now = Date.now();
-    if (pairingApprovalExpiresAt === null || pairingApprovalExpiresAt <= now) {
-      pairingRequestedAt = now;
-      pairingApprovalExpiresAt = null;
-      changed();
-      return json(
-        res,
-        409,
-        {
-          error: 'pairing_approval_required',
-          message: 'Approve this browser in DVS ChatGPT Workflow, then retry the connection.'
-        },
-        origin
-      );
-    }
-
-    // One approval authorizes one token mint. Consume it before touching durable secrets so a
-    // concurrent request cannot reuse the same click.
-    pairingRequestedAt = null;
-    pairingApprovalExpiresAt = null;
+    // Silent provisioning on loopback.
+    //
+    // There used to be a six-digit code here, so the user had to be looking at the app
+    // before a browser could attach. In practice both halves are the same person on the
+    // same machine, installed together, and the code was a step that failed far more
+    // often than it protected anything — the app was unreachable and the user was typing
+    // numbers. The bearer token is still real and still required on every other route; it
+    // is simply issued to whoever asks on 127.0.0.1 rather than to whoever can read the
+    // window. What that gives up is stated plainly: any program already running as this
+    // user can obtain the token, and with it read recorded ChatGPT activity and queue an
+    // "open a fresh chat" command. It can still not read a file, run anything, or change
+    // a permission — the bridge has no route that does. A web page cannot: originOf
+    // refuses anything that is not a chrome-extension:// origin, above.
     const token = randomBytes(32).toString('base64url');
     await setSecret('bridgeToken', token);
     noteBrowserSeen();
@@ -3599,8 +3562,6 @@ export async function stopBridge(): Promise<void> {
     // A stopped listener cannot currently see the extension. Require one fresh authenticated
     // request after the next start rather than carrying a recent sighting across bridge lifetimes.
     lastSeenAt = null;
-    pairingRequestedAt = null;
-    pairingApprovalExpiresAt = null;
     for (const command of commands) {
       if (command.timer) clearTimeout(command.timer);
       command.timer = null;
@@ -6852,8 +6813,6 @@ export function resetBridgeForTests(): void {
   lastBrowserLaunchAt = 0;
   clearPlacementOffer();
   lastSeenAt = null;
-  pairingRequestedAt = null;
-  pairingApprovalExpiresAt = null;
   extensionVersion = null;
   versionWarned = false;
   requestWindow = { start: Date.now(), count: 0 };
